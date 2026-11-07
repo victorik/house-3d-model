@@ -87,6 +87,7 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-size:12px;text-a
     </div>
     <button class="tg" type="button" role="switch" id="t-explode" aria-checked="false">Separate the floors<span class="sw"></span></button>
     <button class="tg" type="button" role="switch" id="t-plan" aria-checked="true">Plan drawing on floors<span class="sw"></span></button>
+    <button class="tg" type="button" role="switch" id="t-site" aria-checked="true">Fence, gate &amp; shop<span class="sw"></span></button>
     <button class="tg" type="button" role="switch" id="t-rotate" aria-checked="false">Slow turntable<span class="sw"></span></button>
   </div>
   <div class="sec">
@@ -721,6 +722,7 @@ const SHOP_DOOR_SIDE=[sz(703.6),sz(719.5)];               // 0.80 m door into th
 const SHOP_DOOR_FRONT=[sx(372.2),sx(403.5)];              // 1.58 m double door onto the street
 const FENCE_H=2.40, FENCE_T=0.225, SHOP_H=3.0, SHOP_FL=0.15;
 const siteG=new THREE.Group(); scene.add(siteG);
+const COL0_N=COL[0].length;
 {
   const g=siteG;
   const render=new THREE.MeshStandardMaterial({color:0xe2dccf,roughness:.95});
@@ -816,9 +818,10 @@ const siteG=new THREE.Group(); scene.add(siteG);
   box(g,M.trim,...ctr,SF,SF+0.95); box(g,steel,ctr[0]-0.02,ctr[1]-0.02,ctr[2]+0.04,ctr[3]+0.04,SF+0.95,SF+0.99);
   COL[0].push(ctr);
   // street in front of the plot: concrete walkway and asphalt road (illustrative)
-  box(g,new THREE.MeshStandardMaterial({color:0xbdb9b1,roughness:.9}),-30,z1,60,1.5,0,0.04,false);
-  box(g,new THREE.MeshStandardMaterial({color:0x4a4d50,roughness:.95}),-30,z1+1.5,60,6.5,0,0.02,false);
+  box(scene,new THREE.MeshStandardMaterial({color:0xbdb9b1,roughness:.9}),-30,z1,60,1.5,0,0.04,false);
+  box(scene,new THREE.MeshStandardMaterial({color:0x4a4d50,roughness:.95}),-30,z1+1.5,60,6.5,0,0.02,false);
 }
+const SITE_COL=COL[0].splice(COL0_N);
 
 
 // --- facts from the drawings
@@ -843,16 +846,17 @@ const siteG=new THREE.Group(); scene.add(siteG);
 }
 
 // --- UI state
-const st={lv:'all',explode:false,plan:true,rotate:false,lift:0};
+const st={lv:'all',explode:false,plan:true,rotate:false,lift:0,site:true};
 function applyVis(){
   levels[1].visible=st.lv!=='gf';
   roofG.visible=st.lv==='all';
   planMeshes.forEach(m=>m.visible=st.plan);
+  siteG.visible=st.site;
 }
 document.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{
   st.lv=b.dataset.lv; document.querySelectorAll('[data-lv]').forEach(x=>x.setAttribute('aria-pressed',x===b));applyVis();}));
 function sw(id,key,cb){const el=document.getElementById(id);el.addEventListener('click',()=>{st[key]=!st[key];el.setAttribute('aria-checked',st[key]);cb&&cb();});}
-sw('t-explode','explode'); sw('t-plan','plan',applyVis); sw('t-rotate','rotate',()=>controls.autoRotate=st.rotate);
+sw('t-explode','explode'); sw('t-site','site',applyVis); sw('t-plan','plan',applyVis); sw('t-rotate','rotate',()=>controls.autoRotate=st.rotate);
 controls.autoRotateSpeed=0.8;
 
 const target=new THREE.Vector3(0,2.0,3.0);
@@ -899,7 +903,7 @@ function groundY(x,z,L){
   if(inStair(x,z)) return stairY(x,z);
   if(L===1) return FFL[1];
   if(FOOT[0].some(r=>inR(x,z,r))||inR(x,z,PORCH)) return FFL[0];
-  if(x>SHOP.x0&&x<SHOP.x1&&z>SHOP.z0&&z<SHOP.z1) return SHOP_FL;
+  if(st.site&&x>SHOP.x0&&x<SHOP.x1&&z>SHOP.z0&&z<SHOP.z1) return SHOP_FL;
   if(x>=PORCH[0]&&x<=PORCH[0]+PORCH[2]){const dz=z-(PORCH[1]+PORCH[3]); if(dz<0.35) return FFL[0]*2/3; if(dz<0.7) return FFL[0]/3;}
   if(x>=SITOUT_STEPS[0]&&x<=SITOUT_STEPS[1]){const dz=SITOUT_RECT[1]-z; if(dz>=0&&dz<0.35) return FFL[0]*2/3; if(dz>=0&&dz<0.7) return FFL[0]/3;}
   return 0;
@@ -907,7 +911,8 @@ function groundY(x,z,L){
 const levelAt=(x,z,L)=>inStair(x,z)?(stairY(x,z)>(FFL[0]+FFL[1])/2?1:0):L;
 function blocked(x,z,L){
   const r=0.22, l=levelAt(x,z,L);
-  if(COL[l].some(c=>x>c[0]-r&&x<c[0]+c[2]+r&&z>c[1]-r&&z<c[1]+c[3]+r)) return true;
+  const hit=c=>x>c[0]-r&&x<c[0]+c[2]+r&&z>c[1]-r&&z<c[1]+c[3]+r;
+  if(COL[l].some(hit)||(l===0&&st.site&&SITE_COL.some(hit))) return true;
   return l===1 && !inStair(x,z) && !FOOT[1].some(c=>inR(x,z,c,-0.05));
 }
 const toPt=(x,z)=>[x*S+CX,z*S+CY], GX=(GATE[0]+GATE[1])/2, SHOP_C=toPt((SHOP.x0+SHOP.x1)/2,(SHOP.z0+SHOP.z1)/2);
