@@ -89,6 +89,7 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-size:12px;text-a
     <button class="tg" type="button" role="switch" id="t-plan" aria-checked="true">Plan drawing on floors<span class="sw"></span></button>
     <button class="tg" type="button" role="switch" id="t-site" aria-checked="true">Fence, gate &amp; shop<span class="sw"></span></button>
     <button class="tg" type="button" role="switch" id="t-yard" aria-checked="true">Backyard: tank, garden, poultry, fish<span class="sw"></span></button>
+    <button class="tg" type="button" role="switch" id="t-cars" aria-checked="true">Parked cars<span class="sw"></span></button>
     <button class="tg" type="button" role="switch" id="t-rotate" aria-checked="false">Slow turntable<span class="sw"></span></button>
   </div>
   <div class="sec">
@@ -127,6 +128,8 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-size:12px;text-a
       <dt>Fence height</dt><dd>2.40 m</dd>
       <dt>Gate</dt><dd>2-leaf steel, 2.30 m</dd>
       <dt>Shop wall height</dt><dd>3.00 m, flat roof</dd>
+      <dt>Cars</dt><dd>2 × 4.7 m saloon, nose-in</dd>
+      <dt>Front yard</dt><dd>Interlocking paving</dd>
       <dt>Water tank</dt><dd>2,000 L, base level with fascia top (6.52 m)</dd>
       <dt>Vegetable beds</dt><dd>3 × 0.85 × 1.90 m</dd>
       <dt>Poultry coop + run</dt><dd>2.60 × 2.20 m</dd>
@@ -828,6 +831,73 @@ const COL0_N=COL[0].length;
 }
 const SITE_COL=COL[0].splice(COL0_N);
 
+// --- front yard: interlocking paving (with the site) and two parked cars (own switch)
+{
+  const c=document.createElement('canvas'); c.width=c.height=256; const x=c.getContext('2d');
+  x.fillStyle='#8f8a84'; x.fillRect(0,0,256,256);
+  for(let r=0;r<8;r++) for(let k=0;k<5;k++){ const off=(r%2)*32;
+    x.fillStyle=['#b9b2a8','#aea79c','#c2bbb1','#a59e93'][(r*3+k)%4];
+    x.fillRect(k*64-off+2,r*32+2,60,28); x.fillRect(k*64-off+2+320,r*32+2,60,28); }
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  const z0=PORCH[1]+PORCH[3]+0.7, z1=PLOT.z1-FENCE_T, x0=PLOT.x0+FENCE_T, x1=PLOT.x1-FENCE_T;
+  t.repeat.set((x1-x0)/1.6,(z1-z0)/1.6);
+  box(siteG,new THREE.MeshStandardMaterial({map:t,roughness:.9}),x0,z0,x1-x0,z1-z0,0,0.02,false);
+}
+const carG=new THREE.Group(); scene.add(carG);
+const CAR_COL=[];
+{
+  const L=4.7, W=1.82;
+  const side=new THREE.Shape([[0,0.34],[0,0.86],[0.18,0.98],[0.95,1.04],[1.35,1.47],[2.95,1.5],[3.5,1.05],[4.5,0.93],[4.7,0.74],[4.7,0.34]].map(([a,b])=>new THREE.Vector2(a,b)));
+  const glassS=new THREE.Shape([[1.05,1.05],[1.42,1.42],[2.9,1.44],[3.38,1.06]].map(([a,b])=>new THREE.Vector2(a,b)));
+  const bodyGeo=new THREE.ExtrudeGeometry(side,{depth:W-0.08,bevelEnabled:true,bevelThickness:0.04,bevelSize:0.04,bevelSegments:3,curveSegments:4});
+  bodyGeo.translate(-L/2,0,-(W-0.08)/2);
+  const glassGeo=new THREE.ExtrudeGeometry(glassS,{depth:W-0.02,bevelEnabled:false}); glassGeo.translate(-L/2,0,-(W-0.02)/2);
+  const darkGlass=new THREE.MeshStandardMaterial({color:0x1e272e,roughness:.25,metalness:.35});
+  const tyre=new THREE.MeshStandardMaterial({color:0x151617,roughness:.9}), rim=new THREE.MeshStandardMaterial({color:0xc7cbcf,metalness:.9,roughness:.25});
+  const black=new THREE.MeshStandardMaterial({color:0x1d1f21,roughness:.6});
+  const head=new THREE.MeshStandardMaterial({color:0xf5f7fa,emissive:0xdfe8ff,emissiveIntensity:.5});
+  const tail=new THREE.MeshStandardMaterial({color:0x9c1414,emissive:0x700000,emissiveIntensity:.6});
+  const plate=new THREE.MeshStandardMaterial({color:0xf2f2ee,roughness:.5});
+  function car(color,cx,cz,rot){
+    const g=new THREE.Group();
+    const paint=new THREE.MeshPhysicalMaterial({color,metalness:.6,roughness:.32,clearcoat:1,clearcoatRoughness:.15});
+    const add=(geo,m,x=0,y=0,z=0)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;g.add(o);return o;};
+    add(bodyGeo,paint); add(glassGeo,darkGlass);
+    // front and rear screens laid just proud of the sloped body faces
+    for(const [ax,ay,bx,by] of [[0.95,1.04,1.35,1.47],[2.95,1.5,3.5,1.05]]){
+      const dx=bx-ax, dy=by-ay, len=Math.hypot(dx,dy), nx=-dy/len, ny=dx/len, sgn=(ax<1.5)?1:-1;
+      const o=add(new THREE.BoxGeometry(len*0.86,0.012,W-0.32),darkGlass,(ax+bx)/2-L/2+sgn*nx*0.045,(ay+by)/2+sgn*ny*0.045,0);
+      o.rotation.z=Math.atan2(dy,dx);
+    }
+    // windscreen pillars break the glass band into windows
+    for(const px of [-L/2+2.1]) add(new THREE.BoxGeometry(0.08,0.4,W),paint,px,1.25,0);
+    // wheels with rims
+    for(const wx of [-L/2+0.85,L/2-0.95]) for(const s of [-1,1]){
+      const w=add(new THREE.CylinderGeometry(0.33,0.33,0.24,28),tyre,wx,0.33,s*(W/2-0.1)); w.rotation.x=Math.PI/2;
+      const r=add(new THREE.CylinderGeometry(0.21,0.21,0.02,20),rim,wx,0.33,s*(W/2+0.025)); r.rotation.x=Math.PI/2;
+      add(new THREE.BoxGeometry(0.85,0.08,0.06),black,wx,0.7,s*(W/2-0.01));            // arch trim
+    }
+    // lights, bumpers, plates, mirrors, handles
+    for(const s of [-1,1]){
+      add(new THREE.BoxGeometry(0.04,0.1,0.38),head,L/2+0.02,0.78,s*0.62);
+      add(new THREE.BoxGeometry(0.04,0.12,0.34),tail,-L/2-0.02,0.84,s*0.64);
+      add(new THREE.BoxGeometry(0.16,0.1,0.06),paint,-L/2+1.35,1.06,s*(W/2+0.04));
+      for(const hx of [-0.35,0.65]) add(new THREE.BoxGeometry(0.16,0.03,0.02),rim,hx,0.95,s*(W/2+0.005));
+    }
+    add(new THREE.BoxGeometry(0.06,0.18,W-0.1),black,L/2+0.01,0.45,0);
+    add(new THREE.BoxGeometry(0.06,0.18,W-0.1),black,-L/2-0.01,0.45,0);
+    add(new THREE.BoxGeometry(0.02,0.12,0.5),plate,L/2+0.05,0.52,0);
+    add(new THREE.BoxGeometry(0.02,0.12,0.5),plate,-L/2-0.05,0.6,0);
+    g.position.set(cx,0.02,cz); g.rotation.y=rot; carG.add(g);
+    const along=Math.abs(Math.sin(rot))>0.5, hw=(along?W:L)/2+0.05, hd=(along?L:W)/2+0.05;
+    CAR_COL.push([cx-hw,cz-hd,2*hw,2*hd]);
+  }
+  // both parked nose-in, facing the house, clear of the porch steps and the gate path
+  const zc=PORCH[1]+PORCH[3]+0.7+0.5+L/2;
+  car(0xe9ecef,-2.9,zc,Math.PI/2);       // pearl white
+  car(0x1f3a5f,-0.33,zc,Math.PI/2);      // dark blue
+}
+
 // --- backyard: overhead water tank, vegetable beds, chicken coop and run, fish pond (layout proposed, not on the drawings)
 const yardG=new THREE.Group(); scene.add(yardG);
 const YARD_COL=[];
@@ -986,18 +1056,19 @@ const YARD={x0:PLOT.x0+FENCE_T,x1:PLOT.x1-FENCE_T,z0:PLOT.z0+FENCE_T};
 }
 
 // --- UI state
-const st={lv:'all',explode:false,plan:true,rotate:false,lift:0,site:true,yard:true};
+const st={lv:'all',explode:false,plan:true,rotate:false,lift:0,site:true,yard:true,cars:true};
 function applyVis(){
   levels[1].visible=st.lv!=='gf';
   roofG.visible=st.lv==='all';
   planMeshes.forEach(m=>m.visible=st.plan);
   siteG.visible=st.site;
   yardG.visible=st.yard;
+  carG.visible=st.cars;
 }
 document.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{
   st.lv=b.dataset.lv; document.querySelectorAll('[data-lv]').forEach(x=>x.setAttribute('aria-pressed',x===b));applyVis();}));
 function sw(id,key,cb){const el=document.getElementById(id);el.addEventListener('click',()=>{st[key]=!st[key];el.setAttribute('aria-checked',st[key]);cb&&cb();});}
-sw('t-explode','explode'); sw('t-site','site',applyVis); sw('t-yard','yard',applyVis); sw('t-plan','plan',applyVis); sw('t-rotate','rotate',()=>controls.autoRotate=st.rotate);
+sw('t-explode','explode'); sw('t-site','site',applyVis); sw('t-yard','yard',applyVis); sw('t-cars','cars',applyVis); sw('t-plan','plan',applyVis); sw('t-rotate','rotate',()=>controls.autoRotate=st.rotate);
 controls.autoRotateSpeed=0.8;
 
 const target=new THREE.Vector3(0,2.0,3.0);
@@ -1053,12 +1124,12 @@ const levelAt=(x,z,L)=>inStair(x,z)?(stairY(x,z)>(FFL[0]+FFL[1])/2?1:0):L;
 function blocked(x,z,L){
   const r=0.22, l=levelAt(x,z,L);
   const hit=c=>x>c[0]-r&&x<c[0]+c[2]+r&&z>c[1]-r&&z<c[1]+c[3]+r;
-  if(COL[l].some(hit)||(l===0&&st.site&&SITE_COL.some(hit))||(l===0&&st.yard&&YARD_COL.some(hit))) return true;
+  if(COL[l].some(hit)||(l===0&&st.site&&SITE_COL.some(hit))||(l===0&&st.yard&&YARD_COL.some(hit))||(l===0&&st.cars&&CAR_COL.some(hit))) return true;
   return l===1 && !inStair(x,z) && !FOOT[1].some(c=>inR(x,z,c,-0.05));
 }
 const toPt=(x,z)=>[x*S+CX,z*S+CY], GX=(GATE[0]+GATE[1])/2, SHOP_C=toPt((SHOP.x0+SHOP.x1)/2,(SHOP.z0+SHOP.z1)/2);
 const TOUR=[ // drawing points: x, y, pause (s), label, optional point to look at while paused
-  [...toPt(GX,PLOT.z1+3.5),2.5,'Street · gate and shop',SHOP_C],[...toPt(GX,PLOT.z1-0.8),1.5,'Front gate',toPt(GX,PLOT.z1-8)],
+  [...toPt(GX,PLOT.z1+3.5),2.5,'Street · gate and shop',SHOP_C],[...toPt(GX,PLOT.z1-0.8),1.5,'Front gate',toPt(GX,PLOT.z1-8)],[...toPt(1.2,16.0),0],
   [622,778,1,'Front garden'],[622,748,1.2,'Front steps'],[622,708,1.5,'Covered porch'],[622,690,0],
   [622,655,2,'Entrance foyer',[660,640]],[616,640,0],[616,617,0],[620,595,0],[620,530,2.5,'Living room',[680,520]],
   [620,450,0],[615,420,0],[605,380,2.5,'Dining',[640,340]],[592,300,0],[585,275,0],[585,262,0],[582,228,2.5,'Kitchen',[525,190]],
