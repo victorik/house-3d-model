@@ -88,6 +88,7 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-size:12px;text-a
     <button class="tg" type="button" role="switch" id="t-explode" aria-checked="false">Separate the floors<span class="sw"></span></button>
     <button class="tg" type="button" role="switch" id="t-plan" aria-checked="true">Plan drawing on floors<span class="sw"></span></button>
     <button class="tg" type="button" role="switch" id="t-site" aria-checked="true">Fence, gate &amp; shop<span class="sw"></span></button>
+    <button class="tg" type="button" role="switch" id="t-yard" aria-checked="true">Backyard: tank, garden, poultry, fish<span class="sw"></span></button>
     <button class="tg" type="button" role="switch" id="t-rotate" aria-checked="false">Slow turntable<span class="sw"></span></button>
   </div>
   <div class="sec">
@@ -126,8 +127,12 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-size:12px;text-a
       <dt>Fence height</dt><dd>2.40 m</dd>
       <dt>Gate</dt><dd>2-leaf steel, 2.30 m</dd>
       <dt>Shop wall height</dt><dd>3.00 m, flat roof</dd>
+      <dt>Water tank</dt><dd>2,000 L on 3.0 m stand</dd>
+      <dt>Vegetable beds</dt><dd>3 × 0.85 × 1.90 m</dd>
+      <dt>Poultry coop + run</dt><dd>2.60 × 2.20 m</dd>
+      <dt>Fish pond</dt><dd>2.20 × 1.30 × 0.90 m</dd>
     </dl>
-    <p class="note">Plot, fence line, gate and shop are from the site plan; the road in front is illustrative. Walls, openings, stair, balconies and the roof outline with its hips and ridge are traced from the PDF. Heights are typical values; tell me the real ones and the model can be updated.</p>
+    <p class="note">Plot, fence line, gate and shop are from the site plan; the road in front and the backyard layout (tank, beds, poultry, fish pond) are proposals. Walls, openings, stair, balconies and the roof outline with its hips and ridge are traced from the PDF. Heights are typical values; tell me the real ones and the model can be updated.</p>
   </div>
 </aside>
 <div class="compass">▲ REAR · FRONT ▼ (entrance)</div>
@@ -823,6 +828,134 @@ const COL0_N=COL[0].length;
 }
 const SITE_COL=COL[0].splice(COL0_N);
 
+// --- backyard: overhead water tank, vegetable beds, chicken coop and run, fish pond (layout proposed, not on the drawings)
+const yardG=new THREE.Group(); scene.add(yardG);
+const YARD_COL=[];
+const YARD={x0:PLOT.x0+FENCE_T,x1:PLOT.x1-FENCE_T,z0:PLOT.z0+FENCE_T};
+{
+  const g=yardG, z0=YARD.z0;
+  const mat=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.8,...o});
+  const steel=mat(0x3a3f44,{metalness:.6,roughness:.45}), galv=mat(0xa9afb3,{metalness:.7,roughness:.4});
+  const block=mat(0xd9d3c7,{roughness:.95}), cope=mat(0xb9b3a9), soil=mat(0x4a3424,{roughness:1});
+  const leaf=mat(0x4f8a3a,{flatShading:true,roughness:.9}), leaf2=mat(0x6aa04a,{flatShading:true,roughness:.9});
+  const timber=mat(0x9a6a43,{roughness:.75}), roofM=mat(0x8c9399,{metalness:.5,roughness:.5,side:THREE.DoubleSide});
+  const mesh=new THREE.MeshStandardMaterial({color:0x7d858b,metalness:.4,roughness:.6,transparent:true,opacity:.28,depthWrite:false,side:THREE.DoubleSide});
+  const paver=mat(0xc8c3ba,{roughness:.9});
+  const col=(r)=>YARD_COL.push(r);
+  const cyl=(rt,rb,h,m,x,y,z,seg=24)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;g.add(o);return o;};
+
+  // paved path from the sit-out steps across the yard
+  const [sa,sb]=SITOUT_STEPS, stepEnd=SITOUT_RECT[1]-0.7;
+  box(g,paver,sa,-12.75,sb-sa,stepEnd+12.75,0,0.03,false);
+  box(g,paver,-1.4,-12.7,sb+1.4,0.45,0,0.03,false);
+
+  // 1. overhead water tank (rear-right, close to the kitchen): 2,000 L tank on a 3.0 m steel stand
+  {
+    const x0=2.35, w=1.9, zz=z0+0.15, d=1.9, H=3.0, cx=x0+w/2, cz=zz+d/2;
+    for(const [a,b] of [[0,0],[1,0],[0,1],[1,1]]){
+      const lx=x0+a*(w-0.1), lz=zz+b*(d-0.1);
+      box(g,steel,lx,lz,0.1,0.1,0,H); box(g,cope,lx-0.1,lz-0.1,0.3,0.3,0,0.15); col([lx,lz,0.1,0.1]);
+    }
+    for(const y of [1.0,2.0]){ box(g,steel,x0,zz,w,0.06,y,y+0.06); box(g,steel,x0,zz+d-0.06,w,0.06,y,y+0.06);
+                              box(g,steel,x0,zz,0.06,d,y,y+0.06); box(g,steel,x0+w-0.06,zz,0.06,d,y,y+0.06); }
+    box(g,steel,x0-0.05,zz-0.05,w+0.1,d+0.1,H,H+0.08);                           // deck
+    const tank=mat(0x23272b,{roughness:.6});                                      // black poly tank
+    cyl(0.72,0.72,1.55,tank,cx,H+0.08+0.775,cz,40);
+    cyl(0.72,0.55,0.18,tank,cx,H+0.08+1.55+0.09,cz,40);
+    cyl(0.22,0.22,0.08,tank,cx,H+0.08+1.55+0.22,cz,24);                          // lid
+    for(let k=0;k<5;k++) cyl(0.735,0.735,0.03,mat(0x2e3337),cx,H+0.25+k*0.3,cz,40); // ribs
+    // down pipe to the house and ladder
+    cyl(0.03,0.03,H+0.3,mat(0xe9e6df),x0+w-0.25,(H+0.3)/2,zz+d-0.05,10);           // outlet pipe down to the supply line
+    for(let y=0.3;y<H;y+=0.3) box(g,galv,x0+0.3,zz+d-0.02,0.5,0.04,y,y+0.03);        // access ladder
+    box(g,galv,x0+0.28,zz+d-0.02,0.04,0.04,0,H); box(g,galv,x0+0.78,zz+d-0.02,0.04,0.04,0,H);
+  }
+
+  // 2. vegetable garden: three raised block beds with crops
+  {
+    const bw=0.85, gap=0.35, d=1.9, zz=z0+0.15, y1=0.4;
+    const crops=[['ugu',leaf,0.16],['tomato',leaf2,0.22],['pepper',leaf,0.14]];
+    for(let i=0;i<3;i++){
+      const x=-1.4+i*(bw+gap);
+      box(g,block,x,zz,bw,0.1,0,y1); box(g,block,x,zz+d-0.1,bw,0.1,0,y1);
+      box(g,block,x,zz,0.1,d,0,y1); box(g,block,x+bw-0.1,zz,0.1,d,0,y1);
+      box(g,soil,x+0.1,zz+0.1,bw-0.2,d-0.2,0,y1-0.05,false);
+      const [,lm,r]=crops[i];
+      for(let a=0;a<2;a++) for(let b=0;b<5;b++){
+        const px=x+0.27+a*0.31, pz=zz+0.3+b*0.32;
+        const p=new THREE.Mesh(new THREE.IcosahedronGeometry(r*(0.85+((a*3+b)%4)*0.08),1),lm);
+        p.position.set(px,y1-0.05+r*0.8,pz); p.castShadow=true; g.add(p);
+        if(i===1){ box(g,timber,px-0.01,pz-0.01,0.02,0.02,y1,y1+0.75,false);                       // tomato stakes
+          const t=new THREE.Mesh(new THREE.SphereGeometry(0.035,10,8),mat(0xc8352a,{roughness:.5})); t.position.set(px+0.06,y1+0.35,pz); g.add(t); }
+      }
+      col([x,zz,bw,d]);
+    }
+  }
+
+  // 3. poultry: raised timber coop with a mesh run (rear-left corner)
+  {
+    const x0=YARD.x0, w=2.6, zz=z0, d=2.2, H=1.9;
+    // run: timber posts, chicken-wire walls and roof
+    for(const [a,b] of [[0,0],[1,0],[0,1],[1,1],[0.5,1]]) box(g,timber,x0+a*(w-0.08),zz+b*(d-0.08),0.08,0.08,0,H);
+    box(g,timber,x0,zz+d-0.08,w,0.08,H-0.08,H); box(g,timber,x0+w-0.08,zz,0.08,d,H-0.08,H);
+    box(g,timber,x0,zz+d-0.08,w,0.08,0,0.1); box(g,timber,x0+w-0.08,zz,0.08,d,0,0.1);
+    box(g,mesh,x0,zz+d-0.04,w,0.01,0.1,H-0.08,false); box(g,mesh,x0+w-0.04,zz,0.01,d,0.1,H-0.08,false);
+    box(g,mesh,x0,zz,w,d,H-0.01,H,false);
+    box(g,mat(0xb89c74,{roughness:1}),x0,zz,w,d,0,0.02,false);                  // wood-shavings litter
+    col([x0,zz,w,d]);
+    // coop house against the rear fence, on legs, with a sloped iron-sheet roof and a ramp
+    const cx0=x0+0.05, cw=1.5, cd=1.05, fy=0.5, ch=1.0;
+    for(const [a,b] of [[0,0],[1,0],[0,1],[1,1]]) box(g,timber,cx0+a*(cw-0.07),zz+0.05+b*(cd-0.07),0.07,0.07,0,fy);
+    box(g,timber,cx0,zz+0.05,cw,cd,fy,fy+0.05);
+    box(g,timber,cx0,zz+0.05,cw,0.04,fy,fy+ch+0.15); box(g,timber,cx0,zz+0.05,0.04,cd,fy,fy+ch); box(g,timber,cx0+cw-0.04,zz+0.05,0.04,cd,fy,fy+ch);
+    box(g,timber,cx0,zz+0.05+cd-0.04,0.45,0.04,fy,fy+ch); box(g,timber,cx0+0.85,zz+0.05+cd-0.04,cw-0.85,0.04,fy,fy+ch);
+    box(g,timber,cx0+0.45,zz+0.05+cd-0.04,0.4,0.04,fy+0.5,fy+ch);                  // pop-hole above
+    const rf=new THREE.Mesh(new THREE.BoxGeometry(cw+0.25,0.025,cd+0.35),roofM);
+    rf.position.set(cx0+cw/2,fy+ch+0.08,zz+0.05+cd/2); rf.rotation.x=0.22; rf.castShadow=true; g.add(rf);
+    const ramp=new THREE.Mesh(new THREE.BoxGeometry(0.35,0.025,0.85),timber);
+    ramp.position.set(cx0+0.65,fy/2,zz+0.05+cd+0.33); ramp.rotation.x=-Math.atan2(fy,0.8); g.add(ramp);
+    // feeder and drinker
+    cyl(0.12,0.16,0.35,mat(0xc0392b,{roughness:.6}),x0+2.1,0.18,zz+0.5);
+    cyl(0.14,0.18,0.3,mat(0x2e86c1,{roughness:.5}),x0+2.1,0.15,zz+1.2);
+    // a few birds
+    const white=mat(0xf4f1ea,{roughness:.9}), brown=mat(0x9b5b2e,{roughness:.9}), red=mat(0xc0281c), beak=mat(0xe0a02a);
+    [[0.5,1.75,0],[1.0,1.5,1.2],[1.6,1.85,2.4],[2.0,1.7,0.7],[1.3,2.0,3.6],[0.75,1.3,5.0]].forEach(([dx,dz,rot],i)=>{
+      const b=new THREE.Group(), bm=i%3===2?brown:white;
+      const body=new THREE.Mesh(new THREE.SphereGeometry(0.13,14,10),bm); body.scale.set(1,0.85,1.3); body.position.y=0.2; b.add(body);
+      const head=new THREE.Mesh(new THREE.SphereGeometry(0.06,12,8),bm); head.position.set(0,0.34,0.14); b.add(head);
+      const comb=new THREE.Mesh(new THREE.BoxGeometry(0.015,0.04,0.06),red); comb.position.set(0,0.41,0.14); b.add(comb);
+      const bk=new THREE.Mesh(new THREE.ConeGeometry(0.018,0.05,6),beak); bk.rotation.x=Math.PI/2; bk.position.set(0,0.33,0.21); b.add(bk);
+      const tail=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.14,0.08),bm); tail.position.set(0,0.3,-0.15); tail.rotation.x=-0.5; b.add(tail);
+      for(const s of [-1,1]){const l=new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.12,5),beak); l.position.set(s*0.04,0.06,0); b.add(l);}
+      b.position.set(x0+dx,0.02,zz+dz); b.rotation.y=rot; b.traverse(o=>o.castShadow=true); g.add(b);
+    });
+  }
+
+  // 4. fish pond: rendered block tank, about 2.2 x 1.3 m, 0.9 m high, with a net frame and pump
+  {
+    const x0=-3.0, w=2.2, zz=-12.2, d=1.3, H=0.9, t=0.15;
+    box(g,block,x0,zz,w,t,0,H); box(g,block,x0,zz+d-t,w,t,0,H); box(g,block,x0,zz,t,d,0,H); box(g,block,x0+w-t,zz,t,d,0,H);
+    box(g,cope,x0-0.03,zz-0.03,w+0.06,t+0.03,H,H+0.05); box(g,cope,x0-0.03,zz+d-t,w+0.06,t+0.03,H,H+0.05);
+    box(g,cope,x0-0.03,zz,t+0.03,d,H,H+0.05); box(g,cope,x0+w-t,zz,t+0.03,d,H,H+0.05);
+    box(g,mat(0x1f3b3a,{roughness:1}),x0+t,zz+t,w-2*t,d-2*t,0,0.3,false);
+    const water=new THREE.Mesh(new THREE.PlaneGeometry(w-2*t,d-2*t),new THREE.MeshPhysicalMaterial({color:0x3f7f78,roughness:.08,transparent:true,opacity:.72}));
+    water.rotation.x=-Math.PI/2; water.position.set(x0+w/2,H-0.15,zz+d/2); g.add(water);
+    const fishM=mat(0x8a8f86,{roughness:.6});                                   // catfish
+    [[0.5,0.4,0.3],[1.2,0.8,2.0],[1.6,0.45,4.0],[0.9,0.6,1.1]].forEach(([dx,dz,r])=>{
+      const f=new THREE.Mesh(new THREE.SphereGeometry(0.07,10,8),fishM); f.scale.set(0.6,0.5,2.2);
+      f.position.set(x0+dx,H-0.3,zz+dz); f.rotation.y=r; g.add(f);});
+    // net cover frame
+    box(g,galv,x0,zz,w,0.03,H+0.05,H+0.08); box(g,galv,x0,zz+d-0.03,w,0.03,H+0.05,H+0.08);
+    box(g,mesh,x0,zz,w,d,H+0.07,H+0.08,false);
+    // pump box and pipe
+    box(g,mat(0x2e86c1,{roughness:.5}),x0+w+0.1,zz+0.4,0.35,0.45,0,0.35);
+    cyl(0.02,0.02,0.6,mat(0xe9e6df),x0+w+0.05,0.6,zz+0.62,8);
+    col([x0,zz,w,d]); col([x0+w+0.1,zz+0.4,0.35,0.45]);
+  }
+  // lawn in the rest of the backyard
+  box(g,mat(0x7aa25a,{roughness:1}),YARD.x0,z0,YARD.x1-YARD.x0,SITOUT_RECT[1]-z0-0.05,0,0.012,false);
+}
+
+
 
 // --- facts from the drawings
 {
@@ -846,17 +979,18 @@ const SITE_COL=COL[0].splice(COL0_N);
 }
 
 // --- UI state
-const st={lv:'all',explode:false,plan:true,rotate:false,lift:0,site:true};
+const st={lv:'all',explode:false,plan:true,rotate:false,lift:0,site:true,yard:true};
 function applyVis(){
   levels[1].visible=st.lv!=='gf';
   roofG.visible=st.lv==='all';
   planMeshes.forEach(m=>m.visible=st.plan);
   siteG.visible=st.site;
+  yardG.visible=st.yard;
 }
 document.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{
   st.lv=b.dataset.lv; document.querySelectorAll('[data-lv]').forEach(x=>x.setAttribute('aria-pressed',x===b));applyVis();}));
 function sw(id,key,cb){const el=document.getElementById(id);el.addEventListener('click',()=>{st[key]=!st[key];el.setAttribute('aria-checked',st[key]);cb&&cb();});}
-sw('t-explode','explode'); sw('t-site','site',applyVis); sw('t-plan','plan',applyVis); sw('t-rotate','rotate',()=>controls.autoRotate=st.rotate);
+sw('t-explode','explode'); sw('t-site','site',applyVis); sw('t-yard','yard',applyVis); sw('t-plan','plan',applyVis); sw('t-rotate','rotate',()=>controls.autoRotate=st.rotate);
 controls.autoRotateSpeed=0.8;
 
 const target=new THREE.Vector3(0,2.0,3.0);
@@ -912,7 +1046,7 @@ const levelAt=(x,z,L)=>inStair(x,z)?(stairY(x,z)>(FFL[0]+FFL[1])/2?1:0):L;
 function blocked(x,z,L){
   const r=0.22, l=levelAt(x,z,L);
   const hit=c=>x>c[0]-r&&x<c[0]+c[2]+r&&z>c[1]-r&&z<c[1]+c[3]+r;
-  if(COL[l].some(hit)||(l===0&&st.site&&SITE_COL.some(hit))) return true;
+  if(COL[l].some(hit)||(l===0&&st.site&&SITE_COL.some(hit))||(l===0&&st.yard&&YARD_COL.some(hit))) return true;
   return l===1 && !inStair(x,z) && !FOOT[1].some(c=>inR(x,z,c,-0.05));
 }
 const toPt=(x,z)=>[x*S+CX,z*S+CY], GX=(GATE[0]+GATE[1])/2, SHOP_C=toPt((SHOP.x0+SHOP.x1)/2,(SHOP.z0+SHOP.z1)/2);
@@ -921,7 +1055,7 @@ const TOUR=[ // drawing points: x, y, pause (s), label, optional point to look a
   [622,778,1,'Front garden'],[622,748,1.2,'Front steps'],[622,708,1.5,'Covered porch'],[622,690,0],
   [622,655,2,'Entrance foyer',[660,640]],[616,640,0],[616,617,0],[620,595,0],[620,530,2.5,'Living room',[680,520]],
   [620,450,0],[615,420,0],[605,380,2.5,'Dining',[640,340]],[592,300,0],[585,275,0],[585,262,0],[582,228,2.5,'Kitchen',[525,190]],
-  [612,194,0],[640,194,0],[660,178,2.5,'Sit-out',[720,160]],[612,194,0],[586,240,0],[585,264,0],[585,285,0],[568,305,0],
+  [612,194,0],[640,194,0],[660,178,2.5,'Sit-out',[720,160]],[...toPt(2.2,-11.3),3.5,'Backyard · tank, vegetables, poultry, fish pond',toPt(-1.2,-14)],[660,178,0],[612,194,0],[586,240,0],[585,264,0],[585,285,0],[568,305,0],
   [551.5,310,1.5,'Stair lobby',[551.5,360]],[551.5,328,0],[551.5,392,0],[551.5,416,0],[526,416,2,'Half landing',[526,330]],
   [526,392,0],[526,328,0],[526,316,0],[526,309,1.5,'Floor 1 landing',[600,309]],[577,312,0],[577,292,0],[577,280,0],
   [577,255,0],[574,205,2.5,'Bedroom',[525,175]],[577,250,0],[577,285,0],[590,315,0],[600,318,0],[645,313,0],[664,313,0],
