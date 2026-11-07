@@ -127,7 +127,7 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-size:12px;text-a
       <dt>Fence height</dt><dd>2.40 m</dd>
       <dt>Gate</dt><dd>2-leaf steel, 2.30 m</dd>
       <dt>Shop wall height</dt><dd>3.00 m, flat roof</dd>
-      <dt>Water tank</dt><dd>2,000 L on 3.0 m stand</dd>
+      <dt>Water tank</dt><dd>2,000 L, base level with fascia top (6.52 m)</dd>
       <dt>Vegetable beds</dt><dd>3 × 0.85 × 1.90 m</dd>
       <dt>Poultry coop + run</dt><dd>2.60 × 2.20 m</dd>
       <dt>Fish pond</dt><dd>2.20 × 1.30 × 0.90 m</dd>
@@ -849,16 +849,23 @@ const YARD={x0:PLOT.x0+FENCE_T,x1:PLOT.x1-FENCE_T,z0:PLOT.z0+FENCE_T};
   box(g,paver,sa,-12.75,sb-sa,stepEnd+12.75,0,0.03,false);
   box(g,paver,-1.4,-12.7,sb+1.4,0.45,0,0.03,false);
 
-  // 1. overhead water tank (rear-right, close to the kitchen): 2,000 L tank on a 3.0 m steel stand
+  // 1. overhead water tank (rear-right, close to the kitchen): 2,000 L tank on a steel tower, its base level with the top of the roof fascia board
   {
-    const x0=2.35, w=1.9, zz=z0+0.15, d=1.9, H=3.0, cx=x0+w/2, cz=zz+d/2;
+    const DECK=0.08, x0=2.35, w=1.9, zz=z0+0.15, d=1.9, H=EAVE+0.22-DECK, cx=x0+w/2, cz=zz+d/2;  // EAVE+0.22 = top of the fascia
     for(const [a,b] of [[0,0],[1,0],[0,1],[1,1]]){
       const lx=x0+a*(w-0.1), lz=zz+b*(d-0.1);
-      box(g,steel,lx,lz,0.1,0.1,0,H); box(g,cope,lx-0.1,lz-0.1,0.3,0.3,0,0.15); col([lx,lz,0.1,0.1]);
+      box(g,steel,lx,lz,0.1,0.1,0,H); box(g,cope,lx-0.15,lz-0.15,0.4,0.4,0,0.25); col([lx,lz,0.1,0.1]);
     }
-    for(const y of [1.0,2.0]){ box(g,steel,x0,zz,w,0.06,y,y+0.06); box(g,steel,x0,zz+d-0.06,w,0.06,y,y+0.06);
+    for(let y=1.0;y<H-0.4;y+=1.05){ box(g,steel,x0,zz,w,0.06,y,y+0.06); box(g,steel,x0,zz+d-0.06,w,0.06,y,y+0.06);
                               box(g,steel,x0,zz,0.06,d,y,y+0.06); box(g,steel,x0+w-0.06,zz,0.06,d,y,y+0.06); }
-    box(g,steel,x0-0.05,zz-0.05,w+0.1,d+0.1,H,H+0.08);                           // deck
+    box(g,steel,x0-0.05,zz-0.05,w+0.1,d+0.1,H,H+DECK);                           // deck
+    for(let y=1.0;y+1.05<H;y+=1.05) for(const [a,b] of [[[x0+0.05,y,zz+d-0.03],[x0+w-0.05,y+1.05,zz+d-0.03]],[[x0+w-0.03,y,zz+0.05],[x0+w-0.03,y+1.05,zz+d-0.05]]]){
+      const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),m=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,A.distanceTo(B),6),steel);
+      m.position.copy(A).add(B).multiplyScalar(.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),B.clone().sub(A).normalize()); m.castShadow=true; g.add(m); }
+    { const y=H+DECK, R=0.9, a0=x0-0.05, a1=x0+w+0.01, b0=zz-0.05, b1=zz+d+0.01;            // guard rail round the deck
+      for(const [px,pz] of [[a0,b0],[a1,b0],[a0,b1],[a1,b1]]) box(g,galv,px,pz,0.04,0.04,y,y+R);
+      for(const h of [R-0.04,R/2]){ box(g,galv,a0,b0,a1-a0+0.04,0.04,y+h,y+h+0.04); box(g,galv,a0,b1,a1-a0+0.04,0.04,y+h,y+h+0.04);
+        box(g,galv,a0,b0,0.04,b1-b0+0.04,y+h,y+h+0.04); box(g,galv,a1,b0,0.04,b1-b0+0.04,y+h,y+h+0.04); } }
     const tank=mat(0x23272b,{roughness:.6});                                      // black poly tank
     cyl(0.72,0.72,1.55,tank,cx,H+0.08+0.775,cz,40);
     cyl(0.72,0.55,0.18,tank,cx,H+0.08+1.55+0.09,cz,40);
