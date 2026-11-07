@@ -75,7 +75,7 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-size:12px;text-a
 <aside class="panel" id="panel">
   <div class="head">
     <button id="toggleP" type="button" aria-expanded="true">Hide</button>
-    <div class="eyebrow">3D model · from plans at 1:100</div>
+    <div class="eyebrow">3D model · from plans at 1:100 + site plan</div>
     <h1>Two-storey house</h1>
   </div>
   <div class="sec">
@@ -122,8 +122,11 @@ dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-size:12px;text-a
       <dt>Risers / going</dt><dd>18 × 167 / 280 mm</dd>
       <dt>Half landing</dt><dd>+1.50 m</dd>
       <dt>Roof pitch (hipped)</dt><dd>25°</dd>
+      <dt>Fence height</dt><dd>2.40 m</dd>
+      <dt>Gate</dt><dd>2-leaf steel, 2.30 m</dd>
+      <dt>Shop wall height</dt><dd>3.00 m, flat roof</dd>
     </dl>
-    <p class="note">Walls, openings, stair, balconies and the roof outline with its hips and ridge are traced from the PDF. Heights are typical values; tell me the real ones and the model can be updated.</p>
+    <p class="note">Plot, fence line, gate and shop are from the site plan; the road in front is illustrative. Walls, openings, stair, balconies and the roof outline with its hips and ridge are traced from the PDF. Heights are typical values; tell me the real ones and the model can be updated.</p>
   </div>
 </aside>
 <div class="compass">▲ REAR · FRONT ▼ (entrance)</div>
@@ -173,9 +176,9 @@ controls.enableDamping=true; controls.maxPolarAngle=Math.PI*0.495; controls.minD
 
 const hemi=new THREE.HemisphereLight(0xffffff,0x8a8f86,1.1); scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff4e6,2.2);
-sun.position.set(14,24,18); sun.castShadow=true;
-sun.shadow.mapSize.set(2048,2048);
-Object.assign(sun.shadow.camera,{left:-16,right:16,top:16,bottom:-16,near:1,far:70});
+sun.position.set(20,34,26); sun.castShadow=true;
+sun.shadow.mapSize.set(4096,4096);
+Object.assign(sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:110});
 sun.shadow.bias=-0.0004; sun.shadow.normalBias=0.02;
 scene.add(sun);
 
@@ -707,6 +710,117 @@ for(const [x,z,w,d] of GEO[1].foot) box(roofG,M.slab,x,z,w,d,CEIL[1],EAVE,true);
 const ground=new THREE.Mesh(new THREE.CircleGeometry(60,64),M.ground);
 ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
+// --- site: boundary fence, front gate and the small shop by the fence
+// traced from the site plan "Ground Floor Plan" (A4 sheet, plot 9.14 x 36.62 m); site-plan points -> model metres
+const SK=180.8/9.14;                                     // site-plan points per metre (plot frontage 9.14 m)
+const sx=pt=>(pt-249.2)/SK-3.704, sz=pt=>(pt-149.6)/SK-10.689;   // aligned on the house outline drawn on the site plan
+const PLOT={x0:sx(233.8),x1:sx(414.6),z0:sz(61.0),z1:sz(784.1)};
+const GATE=[sx(275.3),sx(354.4)];                         // 4.00 m vehicle gate in the front fence
+const SHOP={x0:sx(359.2),x1:sx(414.6),z0:sz(699.1),z1:sz(784.1),t:(362.2-359.2)/SK};  // front-right corner, 2.50 x 4.00 m inside
+const SHOP_DOOR_SIDE=[sz(703.6),sz(719.5)];               // 0.80 m door into the compound
+const SHOP_DOOR_FRONT=[sx(372.2),sx(403.5)];              // 1.58 m double door onto the street
+const FENCE_H=2.40, FENCE_T=0.225, SHOP_H=3.0, SHOP_FL=0.15;
+const siteG=new THREE.Group(); scene.add(siteG);
+{
+  const g=siteG;
+  const render=new THREE.MeshStandardMaterial({color:0xe2dccf,roughness:.95});
+  const base=new THREE.MeshStandardMaterial({color:0x8f8b84,roughness:.95});
+  const cope=new THREE.MeshStandardMaterial({color:0xb9b3a9,roughness:.8});
+  const steel=new THREE.MeshStandardMaterial({color:0x2a2e32,metalness:.6,roughness:.45});
+  const lamp=new THREE.MeshStandardMaterial({color:0xfff1d6,emissive:0xffd9a0,emissiveIntensity:1.6});
+  const {x0,x1,z0,z1}=PLOT, T=FENCE_T;
+  // fence: sandcrete block wall, rendered, dark plinth band, precast coping
+  const runs=[
+    [x0,z0,x1-x0,T],                       // rear
+    [x0,z0,T,z1-z0],                       // left
+    [x1-T,z0,T,SHOP.z0-z0],                // right, up to the back of the shop
+    [x0,z1-T,GATE[0]-0.4-x0,T],            // front, left of the gate pillar
+  ];
+  for(const [x,z,w,d] of runs){
+    box(g,base,x,z,w,d,0,0.3); box(g,render,x,z,w,d,0.3,FENCE_H-0.06);
+    box(g,cope,x-0.03,z-0.03,w+0.06,d+0.06,FENCE_H-0.06,FENCE_H);
+    COL[0].push([x,z,w,d]);
+  }
+  // piers about every 3 m along the fence
+  const pier=(cx,cz,s=0.35,h=FENCE_H+0.12)=>{box(g,render,cx-s/2,cz-s/2,s,s,0,h-0.06);box(g,cope,cx-s/2-0.03,cz-s/2-0.03,s+0.06,s+0.06,h-0.06,h);};
+  const along=(a,b,fix,isX)=>{const n=Math.max(1,Math.round((b-a)/3));for(let i=0;i<=n;i++){const t=a+(b-a)*i/n;isX?pier(t,fix):pier(fix,t);}};
+  along(x0+T/2,x1-T/2,z0+T/2,true);
+  along(z0+T/2,z1-T/2,x0+T/2,false);
+  along(z0+T/2,SHOP.z0,x1-T/2,false);
+  // gate pillars with lamps
+  const GP=0.4, gh=2.75;
+  for(const [px,pw] of [[GATE[0]-GP,GP],[GATE[1],SHOP.x0-GATE[1]]]){
+    box(g,render,px,z1-GP,pw,GP,0,gh-0.08); box(g,cope,px-0.03,z1-GP-0.03,pw+0.06,GP+0.06,gh-0.08,gh);
+    COL[0].push([px,z1-GP,pw,GP]);
+  }
+  box(g,steel,GATE[0]-GP/2-0.07,z1-GP/2-0.07,0.14,0.14,gh,gh+0.05);
+  box(g,lamp,GATE[0]-GP/2-0.06,z1-GP/2-0.06,0.12,0.12,gh+0.05,gh+0.3,false);
+  box(g,steel,GATE[0]-GP/2-0.07,z1-GP/2-0.07,0.14,0.14,gh+0.3,gh+0.33);
+  // two-leaf steel gate: charcoal frame, horizontal slat infill, hidden while walking so you can pass
+  const gz=z1-T/2, lw=(GATE[1]-GATE[0])/2, H=2.30, nG=g.children.length;
+  for(const side of [0,1]){
+    const lx=GATE[0]+side*lw+0.01, w=lw-0.02;
+    box(g,steel,lx,gz-0.04,w,0.08,0.06,0.12); box(g,steel,lx,gz-0.04,w,0.08,H-0.06,H);
+    box(g,steel,lx,gz-0.04,0.06,0.08,0.06,H); box(g,steel,lx+w-0.06,gz-0.04,0.06,0.08,0.06,H);
+    for(let y=0.16;y<H-0.1;y+=0.12) box(g,steel,lx+0.06,gz-0.015,w-0.12,0.03,y,y+0.09);
+    const hx=side===0?lx+w-0.14:lx+0.1;
+    box(g,M.lever,hx,gz-0.08,0.04,0.16,1.0,1.2);
+  }
+  DOORS.push(...g.children.slice(nG));
+  // the shop: 150 mm walls, flat slab, glazed double door to the street, side door into the compound
+  const s=SHOP, t=s.t, SF=SHOP_FL, DH=SF+HEAD;
+  const [dz0,dz1]=SHOP_DOOR_SIDE, [dx0,dx1]=SHOP_DOOR_FRONT;
+  const sw=[
+    [s.x0,s.z0,s.x1-s.x0,t],               // rear
+    [s.x1-t,s.z0,t,s.z1-s.z0],             // right (on the boundary)
+    [s.x0,s.z0,t,dz0-s.z0],[s.x0,dz1,t,s.z1-dz1],          // left, either side of the door
+    [s.x0,s.z1-t,dx0-s.x0,t],[dx1,s.z1-t,s.x1-dx1,t],      // front (on the boundary), either side of the doors
+  ];
+  for(const [x,z,w,d] of sw){ box(g,M.wall,x,z,w,d,0,SHOP_H); COL[0].push([x,z,w,d]); }
+  box(g,M.wall,s.x0,dz0,t,dz1-dz0,DH,SHOP_H);              // lintels
+  box(g,M.wall,dx0,s.z1-t,dx1-dx0,t,DH,SHOP_H);
+  box(g,base,s.x0-0.02,s.z0-0.02,s.x1-s.x0+0.02,0.02,0,0.3,false); box(g,base,s.x0-0.02,s.z0,0.02,s.z1-s.z0,0,0.3,false);
+  // floor, roof slab (overhangs on the compound side only) and fascia
+  box(g,new THREE.MeshStandardMaterial({color:0xcfccc6,roughness:.55}),s.x0+t,s.z0+t,s.x1-s.x0-2*t,s.z1-s.z0-2*t,0,SF);
+  box(g,M.slab,s.x0-0.3,s.z0-0.3,s.x1-s.x0+0.3,s.z1-s.z0+0.3,SHOP_H,SHOP_H+0.15);
+  box(g,M.fascia,s.x0-0.32,s.z0-0.32,s.x1-s.x0+0.32,0.04,SHOP_H-0.05,SHOP_H+0.2);
+  box(g,M.fascia,s.x0-0.32,s.z0-0.32,0.04,s.z1-s.z0+0.32,SHOP_H-0.05,SHOP_H+0.2);
+  box(g,M.fascia,s.x0-0.32,s.z1-0.04,s.x1-s.x0+0.32,0.04,SHOP_H-0.05,SHOP_H+0.2);
+  // side door: same solid walnut leaf as the house's external doors
+  woodDoor(g,s.x0,dz0,t,dz1-dz0,SF,false);
+  // front: aluminium glazed double doors with a low threshold step
+  const nF=g.children.length, fz=s.z1-t/2, fw=(dx1-dx0)/2;
+  for(const k of [0,1]){
+    const lx=dx0+k*fw;
+    box(g,M.glass,lx+0.05,fz-0.01,fw-0.1,0.02,SF+0.05,DH-0.05,false);
+    box(g,M.frame,lx,fz-0.03,fw,0.06,SF,SF+0.05); box(g,M.frame,lx,fz-0.03,fw,0.06,DH-0.05,DH);
+    box(g,M.frame,lx,fz-0.03,0.05,0.06,SF,DH); box(g,M.frame,lx+fw-0.05,fz-0.03,0.05,0.06,SF,DH);
+    box(g,M.frame,lx+0.05,fz-0.03,fw-0.1,0.06,SF+0.95,SF+1.05);
+  }
+  DOORS.push(...g.children.slice(nF));
+  box(g,new THREE.MeshStandardMaterial({color:0xd6d2cb,roughness:.6}),dx0-0.1,s.z1,dx1-dx0+0.2,0.3,0,SF);
+  // street-facing sign board above the doors
+  const sc=document.createElement('canvas'); sc.width=512; sc.height=128; const c2=sc.getContext('2d');
+  c2.fillStyle='#2f6f8f'; c2.fillRect(0,0,512,128); c2.fillStyle='#ffffff'; c2.font='800 68px Chivo, sans-serif';
+  c2.textAlign='center'; c2.textBaseline='middle'; c2.fillText('SHOP',256,68);
+  const signTex=new THREE.CanvasTexture(sc); signTex.colorSpace=THREE.SRGBColorSpace;
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(s.x1-s.x0-0.5,0.55),new THREE.MeshStandardMaterial({map:signTex,roughness:.5}));
+  sign.position.set((s.x0+s.x1)/2,DH+0.42,s.z1+0.012); g.add(sign);
+  // inside: shelving on the right wall and a small counter
+  const shelf=new THREE.MeshStandardMaterial({color:0xa8764a,roughness:.6});
+  const shx=s.x1-t-0.4, shz0=s.z0+t+0.15, shz1=s.z1-t-1.0;
+  box(g,shelf,shx,shz0,0.02,shz1-shz0,SF,SF+2.0);
+  for(const y of [0.1,0.55,1.0,1.45,1.9]) box(g,shelf,shx,shz0,0.4,shz1-shz0,SF+y,SF+y+0.03);
+  COL[0].push([shx,shz0,0.4,shz1-shz0]);
+  const ctr=[s.x0+t+0.1,s.z0+t+1.6,0.55,1.2];
+  box(g,M.trim,...ctr,SF,SF+0.95); box(g,steel,ctr[0]-0.02,ctr[1]-0.02,ctr[2]+0.04,ctr[3]+0.04,SF+0.95,SF+0.99);
+  COL[0].push(ctr);
+  // street in front of the plot: concrete walkway and asphalt road (illustrative)
+  box(g,new THREE.MeshStandardMaterial({color:0xbdb9b1,roughness:.9}),-30,z1,60,1.5,0,0.04,false);
+  box(g,new THREE.MeshStandardMaterial({color:0x4a4d50,roughness:.95}),-30,z1+1.5,60,6.5,0,0.02,false);
+}
+
+
 // --- facts from the drawings
 {
   const bb=(rs)=>{let a=1e9,b=-1e9,c=1e9,e=-1e9;for(const [x,z,w,d] of rs){a=Math.min(a,x);b=Math.max(b,x+w);c=Math.min(c,z);e=Math.max(e,z+d)}return[b-a,e-c]};
@@ -720,6 +834,10 @@ ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
     ['Floor 1 balconies',`${BALCONY[2].toFixed(2)} × ${BALCONY[3].toFixed(2)} m`],
     ['External wall','0.30 m'],['Internal wall','0.15 m'],
     ['Height to ridge',`${(EAVE+0.22+ridgeH).toFixed(2)} m`],
+    ['Plot','9.14 × 36.62 m'],
+    ['Front setback (to house)','10.64 m'],['Rear setback','5.30 m'],
+    ['Gate opening',`${(GATE[1]-GATE[0]).toFixed(2)} m`],
+    ['Shop (inside)','2.50 × 4.00 m'],
   ];
   document.getElementById('facts').innerHTML=rows.map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('');
 }
@@ -737,8 +855,8 @@ function sw(id,key,cb){const el=document.getElementById(id);el.addEventListener(
 sw('t-explode','explode'); sw('t-plan','plan',applyVis); sw('t-rotate','rotate',()=>controls.autoRotate=st.rotate);
 controls.autoRotateSpeed=0.8;
 
-const target=new THREE.Vector3(0,2.2,0.2);
-const views={iso:[19,15,24],top:[0.01,36,0.6],front:[0,4.2,30],side:[32,4.2,0.2]};
+const target=new THREE.Vector3(0,2.0,3.0);
+const views={iso:[24,21,40],top:[0.01,74,3.4],front:[0,5.5,44],side:[44,5.5,3.0]};
 let tween=null;
 function go(name,instant){
   const to=new THREE.Vector3(...views[name]);
@@ -781,6 +899,7 @@ function groundY(x,z,L){
   if(inStair(x,z)) return stairY(x,z);
   if(L===1) return FFL[1];
   if(FOOT[0].some(r=>inR(x,z,r))||inR(x,z,PORCH)) return FFL[0];
+  if(x>SHOP.x0&&x<SHOP.x1&&z>SHOP.z0&&z<SHOP.z1) return SHOP_FL;
   if(x>=PORCH[0]&&x<=PORCH[0]+PORCH[2]){const dz=z-(PORCH[1]+PORCH[3]); if(dz<0.35) return FFL[0]*2/3; if(dz<0.7) return FFL[0]/3;}
   if(x>=SITOUT_STEPS[0]&&x<=SITOUT_STEPS[1]){const dz=SITOUT_RECT[1]-z; if(dz>=0&&dz<0.35) return FFL[0]*2/3; if(dz>=0&&dz<0.7) return FFL[0]/3;}
   return 0;
@@ -791,7 +910,9 @@ function blocked(x,z,L){
   if(COL[l].some(c=>x>c[0]-r&&x<c[0]+c[2]+r&&z>c[1]-r&&z<c[1]+c[3]+r)) return true;
   return l===1 && !inStair(x,z) && !FOOT[1].some(c=>inR(x,z,c,-0.05));
 }
+const toPt=(x,z)=>[x*S+CX,z*S+CY], GX=(GATE[0]+GATE[1])/2, SHOP_C=toPt((SHOP.x0+SHOP.x1)/2,(SHOP.z0+SHOP.z1)/2);
 const TOUR=[ // drawing points: x, y, pause (s), label, optional point to look at while paused
+  [...toPt(GX,PLOT.z1+3.5),2.5,'Street · gate and shop',SHOP_C],[...toPt(GX,PLOT.z1-0.8),1.5,'Front gate',toPt(GX,PLOT.z1-8)],
   [622,778,1,'Front garden'],[622,748,1.2,'Front steps'],[622,708,1.5,'Covered porch'],[622,690,0],
   [622,655,2,'Entrance foyer',[660,640]],[616,640,0],[616,617,0],[620,595,0],[620,530,2.5,'Living room',[680,520]],
   [620,450,0],[615,420,0],[605,380,2.5,'Dining',[640,340]],[592,300,0],[585,275,0],[585,262,0],[582,228,2.5,'Kitchen',[525,190]],
